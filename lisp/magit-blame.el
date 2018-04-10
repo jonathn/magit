@@ -136,7 +136,8 @@ and then turned on again when turning off the latter."
            (define-key map (kbd   "k") 'magit-blame-next-chunk)
            (define-key map (kbd   "K") 'magit-blame-next-chunk-same-commit)
            (define-key map (kbd   "j") 'magit-blame)
-           (define-key map (kbd   "l") 'magit-blame-reverse)
+           (define-key map (kbd   "l") 'magit-blame-removal)
+           (define-key map (kbd   "f") 'magit-blame-reverse)
            (define-key map (kbd   "b") 'magit-blame-popup))
           (t
            (define-key map (kbd "C-m") 'magit-show-commit)
@@ -145,6 +146,7 @@ and then turned on again when turning off the latter."
            (define-key map (kbd   "n") 'magit-blame-next-chunk)
            (define-key map (kbd   "N") 'magit-blame-next-chunk-same-commit)
            (define-key map (kbd   "b") 'magit-blame)
+           (define-key map (kbd   "r") 'magit-blame-removal)
            (define-key map (kbd   "f") 'magit-blame-reverse)
            (define-key map (kbd   "B") 'magit-blame-popup)))
     (define-key map (kbd   "t") 'magit-blame-toggle-headings)
@@ -246,11 +248,17 @@ modes is toggled, then this mode also gets toggled automatically.
               (?r "Do not treat root commits as boundaries" "--root"))
   :options  '((?M "Detect lines moved or copied within a file" "-M")
               (?C "Detect lines moved or copied between files" "-C"))
-  :actions  '((?b "Show blob touching these lines" magit-blame)
+  :actions  '((?b "Show commits adding lines" magit-blame)
               (?r (lambda ()
                     (with-current-buffer magit-pre-popup-buffer
                       (and (not buffer-file-name)
-                           (propertize "Show last blob with these lines"
+                           (propertize "Show commits removing lines"
+                                       'face 'default))))
+                  magit-blame-removal)
+              (?f (lambda ()
+                    (with-current-buffer magit-pre-popup-buffer
+                      (and (not buffer-file-name)
+                           (propertize "Show last commits that still have lines"
                                        'face 'default))))
                   magit-blame-reverse)
               (?h "Toggle chunk headings" magit-blame-toggle-headings))
@@ -340,8 +348,9 @@ modes is toggled, then this mode also gets toggled automatically.
   (let ((buf  (process-get process 'command-buf))
         (pos  (process-get process 'parsed))
         (mark (process-mark process))
-        cache)
+        type cache)
     (with-current-buffer buf
+      (setq type  magit-blame-type)
       (setq cache magit-blame-cache))
     (with-current-buffer (process-buffer process)
       (goto-char pos)
@@ -360,18 +369,36 @@ modes is toggled, then this mode also gets toggled automatically.
             (cond ((looking-at "^filename \\(.+\\)")
                    (oset chunk orig-file (match-string 1)))
                   ((looking-at "^previous \\(.\\{40\\}\\) \\(.+\\)")
+                   (setq       prev-rev  (match-string 1))
                    (oset chunk prev-rev  (match-string 1))
                    (oset chunk prev-file (match-string 2)))
                   ((looking-at "^\\([^ ]+\\) \\(.+\\)")
                    (push (cons (match-string 1)
                                (match-string 2)) alist)))
             (forward-line))
+          (when (and (eq type 'removal) prev-rev)
+            (setq rev prev-rev)
+            (setq alist nil)
+            ;; TODO Can we do better than this?
+            (oset chunk orig-rev prev-rev)
+            (oset chunk orig-file (oref chunk prev-file)))
           (if alist
               (puthash rev alist cache)
-            (setq alist (gethash rev cache)))
+            (setq alist (or (gethash rev cache)
+                            (puthash rev (magit-blame--commit-alist rev)
+                                     cache))))
           (magit-blame-make-overlay buf chunk alist)
           (setq alist nil)
           (process-put process 'parsed (point)))))))
+
+(defun magit-blame--commit-alist (rev)
+  (cl-mapcar 'cons
+             '("summary"
+               "author" "author-time" "author-tz"
+               "committer" "committer-time" "committer-tz")
+             (split-string (magit-rev-format "%s\v%an\v%ad\v%cn\v%cd" rev
+                                             "--date=format:%s\v%z")
+                           "\v")))
 
 (defun magit-blame-assert-buffer (process)
   (unless (buffer-live-p (process-get process 'command-buf))
@@ -452,15 +479,25 @@ modes is toggled, then this mode also gets toggled automatically.
 
 ;;;###autoload
 (defun magit-blame ()
-  "For each line show the revision that last touched it."
+  "For each line show the revision in which it was added."
   (interactive)
   (magit-blame--pre-blame-assert 'addition)
   (magit-blame--pre-blame-setup  'addition)
   (magit-blame--run))
 
 ;;;###autoload
+(defun magit-blame-removal ()
+  "For each line show the revision in which it was removed."
+  (interactive)
+  (unless magit-buffer-file-name
+    (user-error "Only blob buffers can be blamed in reverse"))
+  (magit-blame--pre-blame-assert 'removal)
+  (magit-blame--pre-blame-setup  'removal)
+  (magit-blame--run))
+
+;;;###autoload
 (defun magit-blame-reverse ()
-  "For each line show the last revision in which a line still exists."
+  "For each line show the last revision in which it still exists."
   (interactive)
   (unless magit-buffer-file-name
     (user-error "Only blob buffers can be blamed in reverse"))

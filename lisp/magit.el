@@ -200,23 +200,34 @@ own faces for the `header-line', or for parts of the
 
 ;;; Dispatch Popup
 
+;; TODO key bindings and arrangement
 (defvar magit-file-popup-actions
   '((?s "Stage"     magit-stage-file)
     (?D "Diff..."   magit-diff-buffer-file-popup)
     (?L "Log..."    magit-log-buffer-file-popup)
     (?B "Blame..."  magit-blame-popup) nil
+
     (?u "Unstage"   magit-unstage-file)
     (?d "Diff"      magit-diff-buffer-file)
     (?l "Log"       magit-log-buffer-file)
     (?b "Blame"     magit-blame)
     (?p "Prev blob" magit-blob-previous)
+
     (?c "Commit"    magit-commit-popup) nil nil
     (?r (lambda ()
           (with-current-buffer magit-pre-popup-buffer
             (and (not buffer-file-name)
                  (propertize "...reverse" 'face 'default))))
         magit-blame-reverse)
-    (?n "Next blob" magit-blob-next)))
+    (?n "Next blob" magit-blob-next)
+
+    nil nil nil
+    (?x (lambda ()
+          (with-current-buffer magit-pre-popup-buffer
+            (and (not buffer-file-name)
+                 (propertize "...removal" 'face 'default))))
+        magit-blame-removal)
+    ))
 
 ;;;###autoload (autoload 'magit-dispatch-popup "magit" nil t)
 (magit-define-popup magit-dispatch-popup
