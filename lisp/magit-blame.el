@@ -451,6 +451,15 @@ modes is toggled, then this mode also gets toggled automatically.
 ;;; Commands
 
 ;;;###autoload
+(defun magit-blame-echo ()
+  (interactive)
+  (when magit-buffer-file-name
+    (user-error "Blob buffers aren't supported"))
+  (setq-local magit-blame-show-headings nil)
+  (let ((magit-blame-read-only nil))
+    (magit-blame)))
+
+;;;###autoload
 (defun magit-blame ()
   "For each line show the revision that last touched it."
   (interactive)
