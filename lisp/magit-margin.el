@@ -109,14 +109,16 @@ does not carry to other options."
   (car magit-buffer-margin))
 
 (defun magit-margin-option ()
-  (pcase major-mode
-    (`magit-cherry-mode     'magit-cherry-margin)
-    (`magit-log-mode        'magit-log-margin)
-    (`magit-log-select-mode 'magit-log-select-margin)
-    (`magit-reflog-mode     'magit-reflog-margin)
-    (`magit-refs-mode       'magit-refs-margin)
-    (`magit-stashes-mode    'magit-stashes-margin)
-    (`magit-status-mode     'magit-status-margin)))
+  (if magit-blame-mode
+      'magit-blame-margin
+    (pcase major-mode
+      (`magit-cherry-mode     'magit-cherry-margin)
+      (`magit-log-mode        'magit-log-margin)
+      (`magit-log-select-mode 'magit-log-select-margin)
+      (`magit-reflog-mode     'magit-reflog-margin)
+      (`magit-refs-mode       'magit-refs-margin)
+      (`magit-stashes-mode    'magit-stashes-margin)
+      (`magit-status-mode     'magit-status-margin))))
 
 (defun magit-set-buffer-margin (&optional reset refresh)
   (-when-let (option (magit-margin-option))

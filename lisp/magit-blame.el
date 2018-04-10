@@ -186,10 +186,13 @@ modes is toggled, then this mode also gets toggled automatically.
 (defvar-local magit-blame-type nil)
 (defvar-local magit-blame-separator nil)
 
+(defvar magit-blame-margin '(nil age 30 nil nil))
+
 (define-minor-mode magit-blame-mode
   "Display blame information inline."
   :lighter magit-blame-mode-lighter
   (cond (magit-blame-mode
+         (setq magit-buffer-margin (copy-sequence magit-blame-margin))
          (when (called-interactively-p 'any)
            (setq magit-blame-mode nil)
            (user-error
@@ -390,6 +393,10 @@ modes is toggled, then this mode also gets toggled automatically.
                     (forward-line (1- final-line))
                     (--when-let (magit-blame-overlay-at)
                       (delete-overlay it))
+                    (save-excursion
+                      (goto-char (line-end-position))
+                      (magit-make-margin-overlay
+                       (propertize orig-rev 'face 'bold)))
                     (make-overlay (point)
                                   (progn (forward-line num-lines)
                                          (point))))))
@@ -399,10 +406,11 @@ modes is toggled, then this mode also gets toggled automatically.
           (nconc alist (list (cons 'heading heading))))
         (overlay-put ov 'magit-blame chunk)
         (overlay-put ov 'magit-blame-heading heading)
-        (overlay-put ov 'before-string
-                     (if magit-blame-show-headings
-                         heading
-                       magit-blame-separator))))))
+        (unless (magit-buffer-margin-p)
+          (overlay-put ov 'before-string
+                       (if magit-blame-show-headings
+                           heading
+                         magit-blame-separator)))))))
 
 (defun magit-blame-format-separator ()
   (propertize
@@ -583,7 +591,8 @@ then also kill the buffer."
             (overlay-put it 'before-string
                          (if magit-blame-show-headings
                              (overlay-get it 'magit-blame-heading)
-                           magit-blame-separator)))
+                           (unless (magit-buffer-margin-p)
+                             magit-blame-separator))))
           (goto-char (or next (point-max))))))))
 
 (defun magit-blame-copy-hash ()
